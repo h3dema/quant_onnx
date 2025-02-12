@@ -1,8 +1,14 @@
+"""
+ONNX does not support QAT anymore.
+
+"""
 import os
+import argparse
 import torch
 import onnx
 import onnxruntime as ort
 from onnxruntime import quantization
+from onnxruntime.quantization import QuantizationMode
 
 from config import model_out, onnx_model_name, model_quant_name
 from config import n_features, n_outputs
@@ -49,8 +55,21 @@ class QuantizationDataReader(quantization.CalibrationDataReader):
         self.enum_data = iter(self.torch_dl)
 
 
+def menu():
+    parser = argparse.ArgumentParser(description='ONNX Quantization Script')
+    parser.add_argument('--use-static', dest="use_static", action='store_true', help='Enable static quantization')
+    parser.add_argument('--no-use-static', dest="use_static", action='store_false', help='Disable static quantization')
+    parser.set_defaults(use_static=False)
+
+    parser.add_argument('--use-dynamic', dest="use_dynamic", action='store_true', help='Enable dynamic quantization')
+    parser.add_argument('--no-use-dynamic', dest="use_dynamic", action='store_false', help='Disable dynamic quantization')
+    parser.set_defaults(use_dynamic=True)
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    # main()
+    args = menu()
 
     # create dataset
     dataset = MyRegressionDataset(n_features, n_outputs)
@@ -94,47 +113,34 @@ if __name__ == "__main__":
         input_name=ort_sess.get_inputs()[0].name
     )
 
-    print("Static quantization")
-    quantized_model = quantization.quantize_static(
-        model_input=model_prep_path,
-        model_output=quantized_model_path,
-        calibration_data_reader=qdr,
-        extra_options=q_static_opts
-    )
-    test_models(
-        onnx_model_fp32_path,
-        quantized_model_path,
-        ort_provider,
-        dataset,
-        batch_size,
-    )
+    if args.use_static:
+        print("Static quantization")
+        quantized_model = quantization.quantize_static(
+            model_input=model_prep_path,
+            model_output=quantized_model_path,
+            calibration_data_reader=qdr,
+            extra_options=q_static_opts
+        )
+        test_models(
+            onnx_model_fp32_path,
+            quantized_model_path,
+            ort_provider,
+            dataset,
+            batch_size,
+        )
 
-    print("Dynamic quantization")
-    dyn_quantized_model_path = quantized_model_path.replace("_quantized", "_dyn_quantized")
-    quantized_model = quantization.quantize_dynamic(
-        model_input=model_prep_path,
-        model_output=dyn_quantized_model_path,
-        extra_options={"EnableSubgraph": True}  # whether subgraph will be quantized.
-    )
-    test_models(
-        onnx_model_fp32_path,
-        dyn_quantized_model_path,
-        ort_provider,
-        dataset,
-        batch_size,
-    )
-
-    # Quantize-aware training quantization
-    # print("QAT quantization")
-    # qat_quantized_model_path = quantized_model_path.replace("_quantized", "_qat_quantized")
-    # quantized_model = quantization.quantize_qat(
-    #     model_input=model_prep_path,
-    #     model_output=qat_quantized_model_path,
-    # )
-    # test_models(
-    #     onnx_model_fp32_path,
-    #     qat_quantized_model_path,
-    #     ort_provider,
-    #     dataset,
-    #     batch_size,
-    # )
+    if args.use_dynamic:
+        print("Dynamic quantization")
+        dyn_quantized_model_path = quantized_model_path.replace("_quantized", "_dyn_quantized")
+        quantized_model = quantization.quantize_dynamic(
+            model_input=model_prep_path,
+            model_output=dyn_quantized_model_path,
+            extra_options={"EnableSubgraph": True}  # whether subgraph will be quantized.
+        )
+        test_models(
+            onnx_model_fp32_path,
+            dyn_quantized_model_path,
+            ort_provider,
+            dataset,
+            batch_size,
+        )
