@@ -20,3 +20,5 @@ best_model_name = 'best_model.pth'
 
 onnx_model_name = 'model.onnx'  # name of `best_model_name` conveerted to ONNX format
 model_quant_name = "model_quantized.onnx"
+pt_model_int8_name = "pt_model_int8.pth"
+onnx_model_int8_name = "onnx_model_int8.onnx"
